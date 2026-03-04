@@ -62,7 +62,6 @@ const PublishPost: React.FC = () => {
             const { data, error } = await supabase
                 .from('posts')
                 .select('id, title, slug, created_at, status')
-                .eq('author_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;

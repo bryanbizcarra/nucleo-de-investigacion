@@ -135,7 +135,7 @@ const BlogPost: React.FC = () => {
                     Volver
                 </button>
 
-                {currentUserId === post.author_id && (
+                {currentUserId && (
                     <div className="absolute top-8 right-4 md:right-12 flex items-center gap-4 z-10">
                         <button
                             onClick={() => navigate(`/editar/${post.slug}`)}
