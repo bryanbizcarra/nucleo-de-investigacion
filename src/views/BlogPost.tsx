@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, User, Calendar, Tag } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Calendar, Tag, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import HeaderBar from '../components/HeaderBar';
 import Footer from '../components/Footer';
@@ -18,6 +18,7 @@ interface PostDefinition {
     categories: {
         name: string;
     } | null;
+    author_id: string;
 }
 
 const BlogPost: React.FC = () => {
@@ -26,6 +27,17 @@ const BlogPost: React.FC = () => {
     const [post, setPost] = useState<PostDefinition | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                setCurrentUserId(session.user.id);
+            }
+        };
+        fetchUser();
+    }, []);
 
     useEffect(() => {
         const fetchPost = async () => {
@@ -33,7 +45,7 @@ const BlogPost: React.FC = () => {
             try {
                 const { data, error: fetchError } = await supabase
                     .from('posts')
-                    .select('id, title, slug, content, image_url, created_at, profiles(full_name), categories(name)')
+                    .select('id, title, slug, content, image_url, created_at, author_id, profiles(full_name), categories(name)')
                     .eq('slug', slug)
                     .eq('status', 'published')
                     .single();
@@ -52,6 +64,29 @@ const BlogPost: React.FC = () => {
             fetchPost();
         }
     }, [slug]);
+
+    const handleDelete = async () => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este post? Esta acción no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const { error: deleteError } = await supabase
+                .from('posts')
+                .delete()
+                .eq('id', post?.id);
+
+            if (deleteError) throw deleteError;
+
+            alert('Post eliminado correctamente.');
+            navigate('/blog');
+        } catch (err: any) {
+            console.error('Error deleting post:', err);
+            alert('Error al eliminar el post: ' + err.message);
+            setLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -99,6 +134,25 @@ const BlogPost: React.FC = () => {
                     <ArrowLeft size={20} />
                     Volver
                 </button>
+
+                {currentUserId === post.author_id && (
+                    <div className="absolute top-8 right-4 md:right-12 flex items-center gap-4 z-10">
+                        <button
+                            onClick={() => navigate(`/editar/${post.slug}`)}
+                            className="flex items-center gap-2 text-white font-bold bg-blue-600/80 px-4 py-2 rounded-full backdrop-blur-md hover:bg-blue-600 transition-all shadow-lg"
+                        >
+                            <Edit size={18} />
+                            Editar
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="flex items-center gap-2 text-white font-bold bg-red-600/80 px-4 py-2 rounded-full backdrop-blur-md hover:bg-red-600 transition-all shadow-lg"
+                        >
+                            <Trash2 size={18} />
+                            Eliminar
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Content Section */}

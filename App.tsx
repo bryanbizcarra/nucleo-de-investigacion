@@ -83,6 +83,11 @@ const AppContent: React.FC = () => {
                 <PublishPost />
               </ProtectedRoute>
             } />
+            <Route path="/editar/:slug" element={
+              <ProtectedRoute>
+                <PublishPost />
+              </ProtectedRoute>
+            } />
           </Routes>
         </Suspense>
       </div>
