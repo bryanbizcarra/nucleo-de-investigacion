@@ -37,7 +37,7 @@ const Home: React.FC<{ onNavigate: (target: string) => void }> = ({ onNavigate }
                 <Card title="Novedades y blogs" bgColor="bg-[#dcdde1]" textColor="text-[#2d2d2d]" onClick={() => onNavigate('/blog')} />
             </div>
             <div className="grid grid-rows-2 gap-6 lg:row-span-2">
-                <Card title="Archivos" bgColor="bg-[#dcdde1]" textColor="text-[#2d2d2d]" />
+                <Card title="Archivos" bgColor="bg-[#dcdde1]" textColor="text-[#2d2d2d]" onClick={() => onNavigate('/archivos')} />
                 <Card title="Fotografías del proyecto" bgColor="bg-[#5cc8d7]" textColor="text-white" onClick={() => onNavigate('/fotografias')} />
             </div>
             <div className="flex flex-col gap-6 lg:row-span-2">

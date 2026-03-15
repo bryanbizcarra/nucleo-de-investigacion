@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Upload, X, Loader2, Save, ArrowLeft, Image as ImageIcon, Edit, Trash2, Plus, List, FileText, Camera } from 'lucide-react';
+import { Upload, X, Loader2, Save, ArrowLeft, Image as ImageIcon, Edit, Trash2, Plus, List, FileText, Camera, FileArchive, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import HeaderBar from '../components/HeaderBar';
 import Footer from '../components/Footer';
@@ -16,7 +16,7 @@ interface ItemDefinition {
     slug: string;
     created_at: string;
     status: string;
-    type: 'post' | 'project';
+    type: 'post' | 'project' | 'certificate';
 }
 
 const PublishPost: React.FC = () => {
@@ -36,7 +36,7 @@ const PublishPost: React.FC = () => {
     
     // UI states
     const [viewMode, setViewMode] = useState<'form' | 'list'>('form');
-    const [itemType, setItemType] = useState<'post' | 'project'>('post');
+    const [itemType, setItemType] = useState<'post' | 'project' | 'certificate'>('post');
     const [userItems, setUserItems] = useState<ItemDefinition[]>([]);
     const [loadingItems, setLoadingItems] = useState(false);
 
@@ -45,6 +45,7 @@ const PublishPost: React.FC = () => {
         excerpt: '',
         content: '',
         category_id: '',
+        url: '',
         status: 'published' as 'published' | 'draft'
     });
 
@@ -64,16 +65,16 @@ const PublishPost: React.FC = () => {
         }
     }, [itemType, viewMode, slug]);
 
-    const fetchUserItems = async (type: 'post' | 'project') => {
+    const fetchUserItems = async (type: 'post' | 'project' | 'certificate') => {
         setLoadingItems(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const tableName = type === 'post' ? 'posts' : 'projects';
+            const tableName = type === 'post' ? 'posts' : type === 'project' ? 'projects' : 'certificates';
             let query = supabase.from(tableName).select('id, title, slug, created_at, status').order('created_at', { ascending: false });
             
-            if (type === 'project') {
+            if (type === 'project' || type === 'certificate') {
                 query = query.eq('author_id', user.id);
             }
 
@@ -102,7 +103,7 @@ const PublishPost: React.FC = () => {
                 .eq('slug', slugToFetch)
                 .single();
 
-            let foundType: 'post' | 'project' = 'post';
+            let foundType: 'post' | 'project' | 'certificate' = 'post';
 
             if (error || !data) {
                 // Try project
@@ -112,9 +113,21 @@ const PublishPost: React.FC = () => {
                     .eq('slug', slugToFetch)
                     .single();
                 
-                if (projError) throw projError;
-                data = projData;
-                foundType = 'project';
+                if (projError || !projData) {
+                    // Try certificate
+                    const { data: certData, error: certError } = await supabase
+                        .from('certificates')
+                        .select('*')
+                        .eq('slug', slugToFetch)
+                        .single();
+                        
+                    if (certError) throw certError;
+                    data = certData;
+                    foundType = 'certificate';
+                } else {
+                    data = projData;
+                    foundType = 'project';
+                }
             }
 
             if (data) {
@@ -123,8 +136,9 @@ const PublishPost: React.FC = () => {
                 setFormData({
                     title: data.title,
                     excerpt: data.excerpt || '',
-                    content: data.content,
+                    content: data.content || '',
                     category_id: data.category_id || '',
+                    url: data.url || '',
                     status: data.status as 'published' | 'draft'
                 });
                 if (data.image_url) {
@@ -192,14 +206,14 @@ const PublishPost: React.FC = () => {
         return data.publicUrl;
     };
 
-    const handleDeleteItem = async (idToDelete: string, type: 'post' | 'project') => {
-        if (!window.confirm(`¿Estás seguro de que deseas eliminar est${type === 'post' ? 'e post' : 'e proyecto'}? Esta acción no se puede deshacer.`)) {
+    const handleDeleteItem = async (idToDelete: string, type: 'post' | 'project' | 'certificate') => {
+        if (!window.confirm(`¿Estás seguro de que deseas eliminar est${type === 'post' ? 'e post' : type === 'project' ? 'e proyecto' : 'e certificado'}? Esta acción no se puede deshacer.`)) {
             return;
         }
 
         try {
             setLoadingItems(true);
-            const tableName = type === 'post' ? 'posts' : 'projects';
+            const tableName = type === 'post' ? 'posts' : type === 'project' ? 'projects' : 'certificates';
             const { error: deleteError } = await supabase
                 .from(tableName)
                 .delete()
@@ -260,24 +274,29 @@ const PublishPost: React.FC = () => {
             const postData: any = {
                 title: formData.title,
                 slug: newSlug,
-                excerpt: formData.excerpt,
-                content: formData.content,
                 status: formData.status,
             };
 
-            if (itemType === 'post') {
-                postData.category_id = formData.category_id;
+            if (itemType === 'certificate') {
+                postData.url = formData.url;
+            } else {
+                postData.excerpt = formData.excerpt;
+                postData.content = formData.content;
+
+                if (itemType === 'post') {
+                    postData.category_id = formData.category_id;
+                }
+
+                if (imageUrl) {
+                    postData.image_url = imageUrl;
+                }
+
+                if (itemType === 'project') {
+                    postData.gallery = newGalleryUrls;
+                }
             }
 
-            if (imageUrl) {
-                postData.image_url = imageUrl;
-            }
-
-            if (itemType === 'project') {
-                postData.gallery = newGalleryUrls;
-            }
-
-            const tableName = itemType === 'post' ? 'posts' : 'projects';
+            const tableName = itemType === 'post' ? 'posts' : itemType === 'project' ? 'projects' : 'certificates';
 
             let error;
             if (itemId) {
@@ -298,14 +317,14 @@ const PublishPost: React.FC = () => {
 
             if (error) throw error;
 
-            alert(`¡${itemType === 'post' ? 'Post' : 'Proyecto'} ${itemId ? 'actualizado' : 'publicado'} con éxito!`);
+            alert(`¡${itemType === 'post' ? 'Post' : itemType === 'project' ? 'Proyecto' : 'Certificado'} ${itemId ? 'actualizado' : 'publicado'} con éxito!`);
             if (itemId) {
-                navigate(itemType === 'post' ? '/blog' : '/fotografias');
+                navigate(itemType === 'post' ? '/blog' : itemType === 'project' ? '/fotografias' : '/archivos');
             } else {
                 fetchUserItems(itemType);
                 setViewMode('list');
                 // Reset form
-                setFormData({ title: '', excerpt: '', content: '', category_id: '', status: 'published' });
+                setFormData({ title: '', excerpt: '', content: '', category_id: '', url: '', status: 'published' });
                 setImageFile(null);
                 setImagePreview(null);
                 setGalleryFiles([]);
@@ -321,7 +340,7 @@ const PublishPost: React.FC = () => {
 
     const handleCreateNew = () => {
         setItemId(null);
-        setFormData({ title: '', excerpt: '', content: '', category_id: '', status: 'published' });
+        setFormData({ title: '', excerpt: '', content: '', category_id: '', url: '', status: 'published' });
         setImageFile(null);
         setImagePreview(null);
         setGalleryFiles([]);
@@ -390,6 +409,14 @@ const PublishPost: React.FC = () => {
                                     <Camera size={18} />
                                     Fotografías (Proyectos)
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setItemType('certificate'); fetchUserItems('certificate'); }}
+                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${itemType === 'certificate' ? 'bg-[#5cc8d7] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <FileArchive size={18} />
+                                    Certificados
+                                </button>
                             </div>
                         </div>
                     )}
@@ -397,7 +424,7 @@ const PublishPost: React.FC = () => {
                     {viewMode === 'list' ? (
                         <div className={`bg-white rounded-[40px] shadow-2xl overflow-hidden p-8 md:p-12 border min-h-[50vh] ${itemType === 'post' ? 'border-[#702d8d]/10' : 'border-[#5cc8d7]/10'}`}>
                             <h2 className={`text-2xl font-black mb-8 ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                {itemType === 'post' ? 'Mis Publicaciones' : 'Mis Proyectos'}
+                                {itemType === 'post' ? 'Mis Publicaciones' : itemType === 'project' ? 'Mis Proyectos' : 'Mis Certificados'}
                             </h2>
 
                             {loadingItems ? (
@@ -411,14 +438,14 @@ const PublishPost: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="text-xl font-bold text-[#1a1a1a] mb-2">Aún no tienes contenido aquí</h3>
-                                        <p className="text-gray-500">Crea tu primer {itemType === 'post' ? 'post' : 'proyecto'} para empezar.</p>
+                                        <p className="text-gray-500">Crea tu primer {itemType === 'post' ? 'post' : itemType === 'project' ? 'proyecto' : 'certificado'} para empezar.</p>
                                     </div>
                                     <button
                                         onClick={handleCreateNew}
                                         className={`px-8 py-3 text-white rounded-full font-bold hover:scale-105 transition-transform flex items-center gap-2 mt-4 ${itemType === 'post' ? 'bg-[#702d8d]' : 'bg-[#5cc8d7]'}`}
                                     >
                                         <Plus size={20} />
-                                        Crear {itemType === 'post' ? 'post' : 'proyecto'}
+                                        Crear {itemType === 'post' ? 'post' : itemType === 'project' ? 'proyecto' : 'certificado'}
                                     </button>
                                 </div>
                             ) : (
@@ -467,148 +494,186 @@ const PublishPost: React.FC = () => {
                                     </span>
                                 )}
                                 <h2 className={`text-2xl font-black ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                    {itemId ? "Actualizar Información" : `Detalles del Nuevo ${itemType === 'post' ? 'Post' : 'Proyecto'}`}
+                                    {itemId ? "Actualizar Información" : `Detalles del Nuevo ${itemType === 'post' ? 'Post' : itemType === 'project' ? 'Proyecto' : 'Certificado'}`}
                                 </h2>
                             </div>
 
-                            {/* Image Upload Area */}
-                            <div className="w-full">
-                                <label className={`text-sm font-black uppercase tracking-wider mb-3 block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                    {itemType === 'post' ? 'Imagen Destacada' : 'Fotografía del Proyecto'}
-                                </label>
-                                <div
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className={`relative h-64 md:h-80 w-full rounded-3xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center gap-4 ${imagePreview ? 'border-transparent' : (itemType === 'post' ? 'border-[#702d8d]/20 bg-[#702d8d]/5 hover:bg-[#702d8d]/10' : 'border-[#5cc8d7]/20 bg-[#5cc8d7]/5 hover:bg-[#5cc8d7]/10')}`}
-                                >
-                                    {imagePreview ? (
-                                        <>
-                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setImagePreview(null); setImageFile(null); }}
-                                                className={`absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}
-                                            >
-                                                <X size={20} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className={`w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                                <Upload size={32} />
+                            {itemType === 'certificate' ? (
+                                <div className="space-y-6 w-full">
+                                    <div className="space-y-3">
+                                        <label className="text-sm font-black uppercase tracking-wider block text-[#5cc8d7]">
+                                            Nombre del Archivo o Certificado
+                                        </label>
+                                        <input
+                                            required
+                                            type="text"
+                                            placeholder="Ej: Certificado I Congreso de Ciencia..."
+                                            className="w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium focus:ring-[#5cc8d7]"
+                                            value={formData.title}
+                                            onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-sm font-black uppercase tracking-wider block text-[#5cc8d7]">
+                                            Enlace (URL)
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <LinkIcon size={20} className="text-gray-400" />
                                             </div>
-                                            <div className="text-center">
-                                                <p className={`font-bold text-lg ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>Haz clic para subir una imagen</p>
-                                                <p className="text-[#a0a0a0] text-sm">PNG, JPG o WebP (Recomendado 1200x800px)</p>
+                                            <input
+                                                required
+                                                type="url"
+                                                placeholder="https://..."
+                                                className="w-full pl-12 pr-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium focus:ring-[#5cc8d7]"
+                                                value={formData.url}
+                                                onChange={e => setFormData({ ...formData, url: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Image Upload Area */}
+                                    <div className="w-full">
+                                        <label className={`text-sm font-black uppercase tracking-wider mb-3 block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
+                                            {itemType === 'post' ? 'Imagen Destacada' : 'Fotografía del Proyecto'}
+                                        </label>
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className={`relative h-64 md:h-80 w-full rounded-3xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center gap-4 ${imagePreview ? 'border-transparent' : (itemType === 'post' ? 'border-[#702d8d]/20 bg-[#702d8d]/5 hover:bg-[#702d8d]/10' : 'border-[#5cc8d7]/20 bg-[#5cc8d7]/5 hover:bg-[#5cc8d7]/10')}`}
+                                        >
+                                            {imagePreview ? (
+                                                <>
+                                                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setImagePreview(null); setImageFile(null); }}
+                                                        className={`absolute top-4 right-4 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}
+                                                    >
+                                                        <X size={20} />
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className={`w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
+                                                        <Upload size={32} />
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className={`font-bold text-lg ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>Haz clic para subir una imagen</p>
+                                                        <p className="text-[#a0a0a0] text-sm">PNG, JPG o WebP (Recomendado 1200x800px)</p>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            onChange={handleImageChange}
+                                            accept="image/*"
+                                            className="hidden"
+                                        />
+                                    </div>
+
+                                    <div className={`grid ${itemType === 'post' ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-8`}>
+                                        <div className="space-y-3">
+                                            <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
+                                                Título del {itemType === 'post' ? 'Post' : 'Proyecto'}
+                                            </label>
+                                            <input
+                                                required
+                                                type="text"
+                                                placeholder="Escribe un título impactante..."
+                                                className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
+                                                value={formData.title}
+                                                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                            />
+                                        </div>
+
+                                        {itemType === 'post' && (
+                                            <div className="space-y-3">
+                                                <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
+                                                    Categoría
+                                                </label>
+                                                <select
+                                                    required
+                                                    className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium appearance-none ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
+                                                    value={formData.category_id}
+                                                    onChange={e => setFormData({ ...formData, category_id: e.target.value })}
+                                                >
+                                                    <option value="">Selecciona una categoría</option>
+                                                    {categories.map(cat => (
+                                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                                    ))}
+                                                </select>
                                             </div>
-                                        </>
-                                    )}
-                                </div>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleImageChange}
-                                    accept="image/*"
-                                    className="hidden"
-                                />
-                            </div>
+                                        )}
+                                    </div>
 
-                            <div className={`grid ${itemType === 'post' ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-8`}>
-                                <div className="space-y-3">
-                                    <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                        Título del {itemType === 'post' ? 'Post' : 'Proyecto'}
-                                    </label>
-                                    <input
-                                        required
-                                        type="text"
-                                        placeholder="Escribe un título impactante..."
-                                        className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
-                                        value={formData.title}
-                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                    />
-                                </div>
-
-                                {itemType === 'post' && (
                                     <div className="space-y-3">
                                         <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                            Categoría
+                                            Extracto (Breve resumen)
                                         </label>
-                                        <select
+                                        <textarea
+                                            rows={2}
+                                            placeholder="Una breve descripción que invite a leer..."
+                                            className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium resize-none ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
+                                            value={formData.excerpt}
+                                            onChange={e => setFormData({ ...formData, excerpt: e.target.value })}
+                                        ></textarea>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
+                                            Contenido {itemType === 'post' ? 'del Post' : 'y Detalles'}
+                                        </label>
+                                        <textarea
                                             required
-                                            className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium appearance-none ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
-                                            value={formData.category_id}
-                                            onChange={e => setFormData({ ...formData, category_id: e.target.value })}
-                                        >
-                                            <option value="">Selecciona una categoría</option>
-                                            {categories.map(cat => (
-                                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                            ))}
-                                        </select>
+                                            rows={10}
+                                            placeholder="Escribe aquí toda la información..."
+                                            className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium resize-y ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
+                                            value={formData.content}
+                                            onChange={e => setFormData({ ...formData, content: e.target.value })}
+                                        ></textarea>
                                     </div>
-                                )}
-                            </div>
 
-                            <div className="space-y-3">
-                                <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                    Extracto (Breve resumen)
-                                </label>
-                                <textarea
-                                    rows={2}
-                                    placeholder="Una breve descripción que invite a leer..."
-                                    className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium resize-none ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
-                                    value={formData.excerpt}
-                                    onChange={e => setFormData({ ...formData, excerpt: e.target.value })}
-                                ></textarea>
-                            </div>
-
-                            <div className="space-y-3">
-                                <label className={`text-sm font-black uppercase tracking-wider block ${itemType === 'post' ? 'text-[#702d8d]' : 'text-[#5cc8d7]'}`}>
-                                    Contenido {itemType === 'post' ? 'del Post' : 'y Detalles'}
-                                </label>
-                                <textarea
-                                    required
-                                    rows={10}
-                                    placeholder="Escribe aquí toda la información..."
-                                    className={`w-full px-6 py-4 rounded-2xl bg-[#f8f8f8] border-none focus:ring-2 font-medium resize-y ${itemType === 'post' ? 'focus:ring-[#702d8d]' : 'focus:ring-[#5cc8d7]'}`}
-                                    value={formData.content}
-                                    onChange={e => setFormData({ ...formData, content: e.target.value })}
-                                ></textarea>
-                            </div>
-
-                            {itemType === 'project' && (
-                                <div className="space-y-3">
-                                    <label className="text-sm font-black text-[#5cc8d7] uppercase tracking-wider block">
-                                        Galería de Imágenes (Opcional)
-                                    </label>
-                                    <input 
-                                        type="file" 
-                                        multiple 
-                                        accept="image/*" 
-                                        ref={galleryInputRef} 
-                                        onChange={handleGalleryChange} 
-                                        className="hidden" 
-                                    />
-                                    <div className="flex flex-wrap gap-4">
-                                        {galleryUrls.map((url, i) => (
-                                            <div key={`existing-${i}`} className="relative h-24 w-24 rounded-2xl overflow-hidden border border-[#5cc8d7]/20">
-                                                <img src={url} alt={`Gallery existing ${i}`} className="w-full h-full object-cover" />
-                                                <button type="button" onClick={() => removeGalleryImage(i, true)} className="absolute top-1 right-1 bg-white/80 rounded-full text-red-500 p-1 hover:bg-white"><X size={14} /></button>
+                                    {itemType === 'project' && (
+                                        <div className="space-y-3">
+                                            <label className="text-sm font-black text-[#5cc8d7] uppercase tracking-wider block">
+                                                Galería de Imágenes (Opcional)
+                                            </label>
+                                            <input 
+                                                type="file" 
+                                                multiple 
+                                                accept="image/*" 
+                                                ref={galleryInputRef} 
+                                                onChange={handleGalleryChange} 
+                                                className="hidden" 
+                                            />
+                                            <div className="flex flex-wrap gap-4">
+                                                {galleryUrls.map((url, i) => (
+                                                    <div key={`existing-${i}`} className="relative h-24 w-24 rounded-2xl overflow-hidden border border-[#5cc8d7]/20">
+                                                        <img src={url} alt={`Gallery existing ${i}`} className="w-full h-full object-cover" />
+                                                        <button type="button" onClick={() => removeGalleryImage(i, true)} className="absolute top-1 right-1 bg-white/80 rounded-full text-red-500 p-1 hover:bg-white"><X size={14} /></button>
+                                                    </div>
+                                                ))}
+                                                {galleryFiles.map((file, i) => (
+                                                    <div key={`new-${i}`} className="relative h-24 w-24 rounded-2xl overflow-hidden border border-[#5cc8d7]/20">
+                                                        <img src={URL.createObjectURL(file)} alt={`Gallery preview ${i}`} className="w-full h-full object-cover" />
+                                                        <button type="button" onClick={() => removeGalleryImage(i, false)} className="absolute top-1 right-1 bg-white/80 rounded-full text-red-500 p-1 hover:bg-white"><X size={14} /></button>
+                                                    </div>
+                                                ))}
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => galleryInputRef.current?.click()} 
+                                                    className="h-24 w-24 rounded-2xl border-2 border-dashed border-[#5cc8d7]/30 bg-[#5cc8d7]/5 text-[#5cc8d7] flex flex-col items-center justify-center gap-1 hover:bg-[#5cc8d7]/10 transition-colors"
+                                                >
+                                                    <Plus size={24} />
+                                                    <span className="text-[10px] font-bold">Agregar</span>
+                                                </button>
                                             </div>
-                                        ))}
-                                        {galleryFiles.map((file, i) => (
-                                            <div key={`new-${i}`} className="relative h-24 w-24 rounded-2xl overflow-hidden border border-[#5cc8d7]/20">
-                                                <img src={URL.createObjectURL(file)} alt={`Gallery preview ${i}`} className="w-full h-full object-cover" />
-                                                <button type="button" onClick={() => removeGalleryImage(i, false)} className="absolute top-1 right-1 bg-white/80 rounded-full text-red-500 p-1 hover:bg-white"><X size={14} /></button>
-                                            </div>
-                                        ))}
-                                        <button 
-                                            type="button" 
-                                            onClick={() => galleryInputRef.current?.click()} 
-                                            className="h-24 w-24 rounded-2xl border-2 border-dashed border-[#5cc8d7]/30 bg-[#5cc8d7]/5 text-[#5cc8d7] flex flex-col items-center justify-center gap-1 hover:bg-[#5cc8d7]/10 transition-colors"
-                                        >
-                                            <Plus size={24} />
-                                            <span className="text-[10px] font-bold">Agregar</span>
-                                        </button>
-                                    </div>
-                                </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
 
                             <div className="flex flex-col md:flex-row gap-4 items-center justify-between pt-6 border-t border-[#f0f0f0]">
@@ -642,7 +707,7 @@ const PublishPost: React.FC = () => {
                                     ) : (
                                         <>
                                             <Save size={24} />
-                                            GUARDAR {itemType === 'post' ? 'PUBLICACIÓN' : 'PROYECTO'}
+                                            GUARDAR {itemType === 'post' ? 'PUBLICACIÓN' : itemType === 'project' ? 'PROYECTO' : 'CERTIFICADO'}
                                         </>
                                     )}
                                 </button>
