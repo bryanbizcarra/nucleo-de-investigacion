@@ -26,8 +26,8 @@ const Home: React.FC<{ onNavigate: (target: string) => void }> = ({ onNavigate }
                         </h1>
                     </div>
                     <div className="flex justify-start relative z-10">
-                        <button className="w-14 h-14 rounded-full border-2 border-[#702d8d] flex items-center justify-center text-[#702d8d] hover:bg-[#702d8d] hover:text-white transition-all group">
-                            <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                        <button className="w-14 h-14 rounded-full border-2 border-[#702d8d] flex items-center justify-center text-[#702d8d]">
+                            <ArrowRight />
                         </button>
                     </div>
                 </div>
@@ -41,7 +41,7 @@ const Home: React.FC<{ onNavigate: (target: string) => void }> = ({ onNavigate }
                 <Card title="Fotografías del proyecto" bgColor="bg-[#5cc8d7]" textColor="text-white" />
             </div>
             <div className="flex flex-col gap-6 lg:row-span-2">
-                <Card title="Instagram" bgColor="bg-[#702d8d]" textColor="text-white" icon={<Instagram size={36} className="text-white" />} className="h-[160px] min-h-[160px]" />
+                <Card title="Instagram" bgColor="bg-[#702d8d]" textColor="text-white" icon={<Instagram size={36} className="text-white" />} className="h-[160px] min-h-[160px]" onClick={() => window.open('https://www.instagram.com/nii_gec/', '_blank')} />
                 <div onClick={() => onNavigate('/about')} className="relative group overflow-hidden rounded-[2rem] flex-1 min-h-[480px] shadow-sm cursor-pointer transition-transform hover:scale-[1.02]">
                     <img src="/imagenes/fondo-mujeres-home.jpg" alt="Sobre nosotras" className="absolute inset-0 w-full h-full object-cover object-center grayscale brightness-100 transition-transform duration-700 group-hover:scale-125 scale-110" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
