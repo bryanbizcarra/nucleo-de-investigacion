@@ -13,6 +13,8 @@ const About = React.lazy(() => import('./src/views/About'));
 const PublishPost = React.lazy(() => import('./src/views/PublishPost'));
 const Login = React.lazy(() => import('./src/views/Login'));
 const BlogPost = React.lazy(() => import('./src/views/BlogPost'));
+const Projects = React.lazy(() => import('./src/views/Projects'));
+const ProjectDetail = React.lazy(() => import('./src/views/ProjectDetail'));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -76,6 +78,8 @@ const AppContent: React.FC = () => {
             <Route path="/details" element={<Details />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/fotografias" element={<Projects />} />
+            <Route path="/fotografias/:slug" element={<ProjectDetail />} />
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
             <Route path="/publicar" element={

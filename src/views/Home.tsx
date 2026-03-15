@@ -38,7 +38,7 @@ const Home: React.FC<{ onNavigate: (target: string) => void }> = ({ onNavigate }
             </div>
             <div className="grid grid-rows-2 gap-6 lg:row-span-2">
                 <Card title="Archivos" bgColor="bg-[#dcdde1]" textColor="text-[#2d2d2d]" />
-                <Card title="Fotografías del proyecto" bgColor="bg-[#5cc8d7]" textColor="text-white" />
+                <Card title="Fotografías del proyecto" bgColor="bg-[#5cc8d7]" textColor="text-white" onClick={() => onNavigate('/fotografias')} />
             </div>
             <div className="flex flex-col gap-6 lg:row-span-2">
                 <Card title="Instagram" bgColor="bg-[#702d8d]" textColor="text-white" icon={<Instagram size={36} className="text-white" />} className="h-[160px] min-h-[160px]" onClick={() => window.open('https://www.instagram.com/nii_gec/', '_blank')} />
